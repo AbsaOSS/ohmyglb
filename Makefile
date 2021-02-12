@@ -95,11 +95,11 @@ deploy:
 .PHONY: deploy-full-local-setup
 deploy-full-local-setup: ## Deploy full local multicluster setup
 	docker network create --driver=bridge --subnet=172.16.0.0/24 $(CLUSTER_GSLB_NETWORK)
-	$(call create-local-cluster,$(CLUSTER_GSLB1),-p "80:80@agent[0]" -p "443:443@agent[0]" -p "5053:53/udp@agent[0]" )
-	$(call create-local-cluster,$(CLUSTER_GSLB2),-p "81:80@agent[0]" -p "444:443@agent[0]" -p "5054:53/udp@agent[0]" )
+	$(call create-local-cluster,$(CLUSTER_GSLB1),-p "80:80@loadbalancer" -p "443:443@loadbalancer" -p "5053:53/udp@loadbalancer" )
+	$(call create-local-cluster,$(CLUSTER_GSLB2),-p "81:80@loadbalancer" -p "444:443@loadbalancer" -p "5054:53/udp@loadbalancer" )
 
-	$(call deploy-local-cluster,$(CLUSTER_GSLB1),$(CLUSTER_GSLB2),absaoss/k8gb,)
-	$(call deploy-local-cluster,$(CLUSTER_GSLB2),$(CLUSTER_GSLB1),absaoss/k8gb,$(CLUSTER_GSLB2_HELM_ARGS))
+	$(call deploy-local-cluster,$(CLUSTER_GSLB1),$(CLUSTER_GSLB2),absaoss/k8gb,$(VERSION))
+	$(call deploy-local-cluster,$(CLUSTER_GSLB2),$(CLUSTER_GSLB1),absaoss/k8gb,$(VERSION),$(CLUSTER_GSLB2_HELM_ARGS))
 
 
 # triggered by terraform GitHub Action. Clusters already exists. GO is not installed yet
@@ -303,12 +303,15 @@ help: ## Show this help
 define create-local-cluster
 	@echo "\n$(YELLOW)Deploy local cluster $(CYAN)$1 $(NC)"
 	k3d cluster create $1 $2 \
-	--agents 3 --no-lb --k3s-server-arg "--no-deploy=traefik,servicelb,metrics-server" --network $(CLUSTER_GSLB_NETWORK)
+	--k3s-server-arg "--no-deploy=metrics-server" --network $(CLUSTER_GSLB_NETWORK)
 endef
 
 define deploy-local-cluster
 	@echo "\n$(YELLOW)Local cluster $(CYAN)$1 $(NC)"
 	kubectl config use-context k3d-$1
+
+	@echo "\n$(YELLOW)Import image into $1"
+	k3d image import -c $1 $(IMG)-amd64
 
 	@echo "\n$(YELLOW)Create namespace $(NC)"
 	kubectl apply -f deploy/namespace.yaml
@@ -318,13 +321,14 @@ define deploy-local-cluster
 	helm -n k8gb upgrade -i k8gb chart/k8gb -f $(VALUES_YAML) \
 		--set k8gb.hostAlias.enabled=true \
 		--set k8gb.hostAlias.ip="`$(call get-host-alias-ip,k3d-$1,k3d-$2)`" \
-		--set k8gb.imageRepo=$3 $4
+		--set k8gb.imageRepo=$3 \
+		--set k8gb.imageTag=$4-amd64 $5
 
-	@echo "\n$(YELLOW)Deploy Ingress $(NC)"
-	helm repo add --force-update stable https://charts.helm.sh/stable
-	helm repo update
-	helm -n k8gb upgrade -i nginx-ingress stable/nginx-ingress \
-		--version 1.41.1 -f deploy/ingress/nginx-ingress-values.yaml
+#	@echo "\n$(YELLOW)Deploy Ingress $(NC)"
+#	helm repo add --force-update stable https://charts.helm.sh/stable
+#	helm repo update
+#	helm -n k8gb upgrade -i nginx-ingress stable/nginx-ingress \
+#		--version 1.41.1 -f deploy/ingress/nginx-ingress-values.yaml
 
 	@echo "\n$(YELLOW)Deploy GSLB cr $(NC)"
 	kubectl apply -f deploy/crds/test-namespace.yaml
@@ -334,14 +338,14 @@ define deploy-local-cluster
 	@echo "\n$(YELLOW)Deploy test apps $(NC)"
 	$(call deploy-test-apps)
 
-	@echo "\n$(YELLOW)Wait until Ingress controller is ready $(NC)"
-	$(call wait)
+#	@echo "\n$(YELLOW)Wait until Ingress controller is ready $(NC)"
+##	$(call wait)
 
 	@echo "\n$(CYAN)$1 $(YELLOW)deployed! $(NC)"
 endef
 
 define apply-cr
-	sed -i 's/cloud\.example\.com/$(GSLB_DOMAIN)/g' "$1"
+	#sed -i 's/cloud\.example\.com/$(GSLB_DOMAIN)/g' "$1"
 	kubectl apply -f "$1"
 	git checkout -- "$1"
 endef
@@ -363,7 +367,7 @@ endef
 # function returns one IP address
 define get-host-alias-ip
 	kubectl config use-context $2 > /dev/null && \
-	kubectl get nodes $2-agent-0 -o custom-columns='IP:status.addresses[0].address' --no-headers && \
+	kubectl get nodes $2-server-0 -o custom-columns='IP:status.addresses[0].address' --no-headers && \
 	kubectl config use-context $1 > /dev/null
 endef
 

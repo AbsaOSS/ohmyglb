@@ -34,9 +34,11 @@ coredns:
   serviceAccount:
     create: true
     name: coredns
+  serviceType: LoadBalancer
   servers:
   - zones:
     - zone: .
+      scheme: dns://
     port: 53
     plugins:
     - name: cache
