@@ -12,6 +12,7 @@ require (
 	github.com/miekg/dns v1.1.40
 	github.com/onsi/ginkgo v1.14.2 // indirect
 	github.com/prometheus/client_golang v1.9.0
+	github.com/rs/zerolog v1.20.0
 	github.com/stretchr/testify v1.7.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4

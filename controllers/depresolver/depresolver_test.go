@@ -27,6 +27,7 @@ import (
 
 	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
 	"github.com/AbsaOSS/k8gb/controllers/internal/utils"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -57,6 +58,9 @@ var predefinedConfig = Config{
 	Override: Override{
 		false,
 		false,
+	},
+	Logger: Logger{
+		OutputFormat: ConsoleMonoFormat,
 	},
 }
 
@@ -154,6 +158,8 @@ func TestResolveConfigWithoutEnvVarsSet(t *testing.T) {
 	defaultConfig.Infoblox.HTTPPoolConnections = 10
 	defaultConfig.EdgeDNSType = DNSTypeNoEdgeDNS
 	defaultConfig.ExtClustersGeoTags = []string{}
+	defaultConfig.Logger.Level = zerolog.InfoLevel
+	defaultConfig.Logger.OutputFormat = ConsoleMonoFormat
 	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
 	resolver := NewDependencyResolver(cl)
 	// act
@@ -1091,6 +1097,136 @@ func TestResolveConfigEnableFakeInfobloxAsUnsetEnvironmentVariable(t *testing.T)
 	arrangeVariablesAndAssert(t, predefinedConfig, assert.NoError, OverrideFakeInfobloxKey)
 }
 
+func TestResolveLoggerUseDefaultValue(t *testing.T) {
+	// arrange
+	// Build zerolog from empty string which is equal to zerolog.NoLevel.
+	// Depresolver handles it "" and use default value - info level
+	defer cleanup()
+	expected := predefinedConfig
+	expected.Logger.Level = zerolog.InfoLevel
+	// act
+	// assert
+	arrangeVariablesAndAssert(t, expected, assert.NoError, LoggerLevelKey, LoggerOutputFormatKey)
+}
+
+func TestResolveLoggerOutputFormatMode(t *testing.T) {
+	// arrange
+	defer cleanup()
+	expected := predefinedConfig
+	expected.Logger.OutputFormat = ConsoleColoredFormat
+	expected.Logger.Level = zerolog.InfoLevel
+	// act
+	// assert
+	arrangeVariablesAndAssert(t, expected, assert.NoError, LoggerLevelKey)
+}
+
+func TestResolveLoggerDebugMode(t *testing.T) {
+	// arrange
+	expected := predefinedConfig
+	expected.Logger.Level = zerolog.DebugLevel
+	// act
+	// assert
+	arrangeVariablesAndAssert(t, expected, assert.NoError)
+}
+
+func TestResolveLoggerInfoMode(t *testing.T) {
+	// arrange
+	expected := predefinedConfig
+	expected.Logger.Level = zerolog.InfoLevel
+	// act
+	// assert
+	arrangeVariablesAndAssert(t, expected, assert.NoError)
+}
+
+func TestResolveLoggerCaseInsensitiveMode(t *testing.T) {
+	// arrange
+	defer cleanup()
+	configureEnvVar(predefinedConfig)
+	_ = os.Setenv(LoggerLevelKey, "WARn")
+	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
+	resolver := NewDependencyResolver(cl)
+	// act
+	config, err := resolver.ResolveOperatorConfig()
+	// assert
+	assert.NoError(t, err)
+	assert.Equal(t, zerolog.WarnLevel, config.Logger.Level)
+}
+
+func TestResolveLoggerCaseInsensitiveOutputFormat(t *testing.T) {
+	// arrange
+	defer cleanup()
+	configureEnvVar(predefinedConfig)
+	_ = os.Setenv(LoggerOutputFormatKey, "Json")
+	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
+	resolver := NewDependencyResolver(cl)
+	// act
+	config, err := resolver.ResolveOperatorConfig()
+	// assert
+	assert.NoError(t, err)
+	assert.Equal(t, JSONFormat, config.Logger.OutputFormat)
+}
+
+func TestResolveLoggerLevelWithInvalidValue(t *testing.T) {
+	// arrange
+	defer cleanup()
+	configureEnvVar(predefinedConfig)
+	_ = os.Setenv(LoggerLevelKey, "i.am.wrong??.")
+	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
+	resolver := NewDependencyResolver(cl)
+	// act
+	config, err := resolver.ResolveOperatorConfig()
+	// assert
+	assert.Error(t, err)
+	assert.Equal(t, zerolog.InfoLevel, config.Logger.Level)
+	assert.Equal(t, ConsoleMonoFormat, config.Logger.OutputFormat)
+}
+
+func TestResolveLoggerOutputWithInvalidValue(t *testing.T) {
+	// arrange
+	defer cleanup()
+	configureEnvVar(predefinedConfig)
+	_ = os.Setenv(LoggerOutputFormatKey, "i.am.wrong??.")
+	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
+	resolver := NewDependencyResolver(cl)
+	// act
+	config, err := resolver.ResolveOperatorConfig()
+	// assert
+	assert.Error(t, err)
+	assert.Equal(t, ConsoleMonoFormat, config.Logger.OutputFormat)
+}
+
+func TestResolveLoggerWithEmptyValues(t *testing.T) {
+	// arrange
+	defer cleanup()
+	configureEnvVar(predefinedConfig)
+	_ = os.Setenv(LoggerOutputFormatKey, "")
+	_ = os.Setenv(LoggerLevelKey, "")
+	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
+	resolver := NewDependencyResolver(cl)
+	// act
+	config, err := resolver.ResolveOperatorConfig()
+	// assert
+	assert.NoError(t, err)
+	assert.Equal(t, ConsoleMonoFormat, config.Logger.OutputFormat)
+	assert.Equal(t, zerolog.InfoLevel, config.Logger.Level)
+}
+
+func TestResolveLoggerEmptyValues(t *testing.T) {
+	// arrange
+	defer cleanup()
+	configureEnvVar(predefinedConfig)
+	_ = os.Setenv(LoggerOutputFormatKey, "")
+	_ = os.Setenv(LoggerLevelKey, "")
+	cl, _ := getTestContext("./testdata/filled_omitempty.yaml")
+	resolver := NewDependencyResolver(cl)
+	// act
+	config, err := resolver.ResolveOperatorConfig()
+	// assert
+	assert.NoError(t, err)
+	assert.Equal(t, zerolog.InfoLevel, config.Logger.Level)
+	assert.Equal(t, ConsoleMonoFormat, config.Logger.OutputFormat)
+}
+
 // arrangeVariablesAndAssert sets string environment variables and asserts `expected` argument with
 // ResolveOperatorConfig() output. The last parameter unsets the values
 func arrangeVariablesAndAssert(t *testing.T, expected Config,
@@ -1115,7 +1251,7 @@ func cleanup() {
 	for _, s := range []string{ReconcileRequeueSecondsKey, ClusterGeoTagKey, ExtClustersGeoTagsKey, EdgeDNSZoneKey, DNSZoneKey, EdgeDNSServerKey,
 		Route53EnabledKey, NS1EnabledKey, InfobloxGridHostKey, InfobloxVersionKey, InfobloxPortKey, InfobloxUsernameKey, InfobloxPasswordKey,
 		OverrideWithFakeDNSKey, OverrideFakeInfobloxKey, K8gbNamespaceKey, CoreDNSExposedKey, InfobloxHTTPRequestTimeoutKey,
-		InfobloxHTTPPoolConnectionsKey} {
+		InfobloxHTTPPoolConnectionsKey, LoggerLevelKey, LoggerOutputFormatKey} {
 		if os.Unsetenv(s) != nil {
 			panic(fmt.Errorf("cleanup %s", s))
 		}
@@ -1142,6 +1278,8 @@ func configureEnvVar(config Config) {
 	_ = os.Setenv(InfobloxHTTPPoolConnectionsKey, strconv.Itoa(config.Infoblox.HTTPPoolConnections))
 	_ = os.Setenv(OverrideWithFakeDNSKey, strconv.FormatBool(config.Override.FakeDNSEnabled))
 	_ = os.Setenv(OverrideFakeInfobloxKey, strconv.FormatBool(config.Override.FakeInfobloxEnabled))
+	_ = os.Setenv(LoggerLevelKey, config.Logger.Level.String())
+	_ = os.Setenv(LoggerOutputFormatKey, config.Logger.OutputFormat.String())
 }
 
 func getTestContext(testData string) (client.Client, *k8gbv1beta1.Gslb) {

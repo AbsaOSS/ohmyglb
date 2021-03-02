@@ -108,7 +108,6 @@ func TestK8gbSpecKeepsStableAfterIngressUpdates(t *testing.T) {
 		assertGslbSpec(t, options, name, "spec.strategy.type", "failover")
 	}
 
-
 	kubeResourcePath, err := filepath.Abs("../examples/failover-spec.yaml")
 	ingressResourcePath, err := filepath.Abs("../examples/ingress-annotation-failover.yaml")
 	require.NoError(t, err)

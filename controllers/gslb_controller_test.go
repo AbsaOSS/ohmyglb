@@ -87,6 +87,9 @@ var predefinedConfig = depresolver.Config{
 	Override: depresolver.Override{
 		FakeInfobloxEnabled: true,
 	},
+	Logger: depresolver.Logger{
+		OutputFormat: depresolver.ConsoleMonoFormat,
+	},
 }
 
 const coreDNSExtServiceName = "k8gb-coredns-lb"
@@ -1137,7 +1140,8 @@ func cleanup() {
 		depresolver.EdgeDNSZoneKey, depresolver.DNSZoneKey, depresolver.EdgeDNSServerKey, depresolver.K8gbNamespaceKey,
 		depresolver.Route53EnabledKey, depresolver.InfobloxGridHostKey, depresolver.InfobloxVersionKey, depresolver.InfobloxPortKey,
 		depresolver.InfobloxUsernameKey, depresolver.InfobloxPasswordKey, depresolver.InfobloxHTTPRequestTimeoutKey,
-		depresolver.InfobloxHTTPPoolConnectionsKey, depresolver.OverrideWithFakeDNSKey, depresolver.OverrideFakeInfobloxKey} {
+		depresolver.InfobloxHTTPPoolConnectionsKey, depresolver.OverrideWithFakeDNSKey, depresolver.OverrideFakeInfobloxKey,
+		depresolver.LoggerLevelKey, depresolver.LoggerOutputFormatKey} {
 		if os.Unsetenv(s) != nil {
 			panic(fmt.Errorf("cleanup %s", s))
 		}
@@ -1162,4 +1166,6 @@ func configureEnvVar(config depresolver.Config) {
 	_ = os.Setenv(depresolver.InfobloxHTTPPoolConnectionsKey, strconv.Itoa(config.Infoblox.HTTPPoolConnections))
 	_ = os.Setenv(depresolver.OverrideWithFakeDNSKey, strconv.FormatBool(config.Override.FakeDNSEnabled))
 	_ = os.Setenv(depresolver.OverrideFakeInfobloxKey, strconv.FormatBool(config.Override.FakeInfobloxEnabled))
+	_ = os.Setenv(depresolver.LoggerLevelKey, config.Logger.Level.String())
+	_ = os.Setenv(depresolver.LoggerOutputFormatKey, config.Logger.OutputFormat.String())
 }

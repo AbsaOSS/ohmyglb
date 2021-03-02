@@ -18,8 +18,10 @@ package depresolver
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/AbsaOSS/gopkg/env"
+	"github.com/rs/zerolog"
 )
 
 // Environment variables keys
@@ -44,6 +46,8 @@ const (
 	OverrideFakeInfobloxKey        = "FAKE_INFOBLOX"
 	K8gbNamespaceKey               = "POD_NAMESPACE"
 	CoreDNSExposedKey              = "COREDNS_EXPOSED"
+	LoggerLevelKey                 = "LOGGER_LEVEL"
+	LoggerOutputFormatKey          = "LOGGER_OUTPUT_FORMAT"
 )
 
 // ResolveOperatorConfig executes once. It reads operator's configuration
@@ -70,6 +74,8 @@ func (dr *DependencyResolver) ResolveOperatorConfig() (*Config, error) {
 		dr.config.Infoblox.HTTPRequestTimeout, _ = env.GetEnvAsIntOrFallback(InfobloxHTTPRequestTimeoutKey, 20)
 		dr.config.Override.FakeDNSEnabled = env.GetEnvAsBoolOrFallback(OverrideWithFakeDNSKey, false)
 		dr.config.Override.FakeInfobloxEnabled = env.GetEnvAsBoolOrFallback(OverrideFakeInfobloxKey, false)
+		dr.config.Logger.Level, _ = zerolog.ParseLevel(strings.ToLower(env.GetEnvAsStringOrFallback(LoggerLevelKey, zerolog.InfoLevel.String())))
+		dr.config.Logger.OutputFormat = parseLoggerOutputFormat(strings.ToLower(env.GetEnvAsStringOrFallback(LoggerOutputFormatKey, "mono")))
 		dr.errorConfig = dr.validateConfig(dr.config)
 		dr.config.EdgeDNSType = getEdgeDNSType(dr.config)
 	})
@@ -77,6 +83,14 @@ func (dr *DependencyResolver) ResolveOperatorConfig() (*Config, error) {
 }
 
 func (dr *DependencyResolver) validateConfig(config *Config) (err error) {
+	if config.Logger.Level == zerolog.NoLevel {
+		config.Logger.Level = zerolog.InfoLevel
+		return fmt.Errorf("invalid %s, allowed values ['','trace','debug','info','warn','error','fatal','panic']", LoggerLevelKey)
+	}
+	if config.Logger.OutputFormat == unrecognisedFormat {
+		config.Logger.OutputFormat = ConsoleMonoFormat
+		return fmt.Errorf("invalid %s, allowed values ['','json','mono','color']", LoggerOutputFormatKey)
+	}
 	err = field("k8gbNamespace", config.K8gbNamespace).isNotEmpty().matchRegexp(k8sNamespaceRegex).err
 	if err != nil {
 		return err
@@ -161,4 +175,16 @@ func getEdgeDNSType(config *Config) EdgeDNSType {
 		t -= DNSTypeNoEdgeDNS
 	}
 	return t
+}
+
+func parseLoggerOutputFormat(value string) LoggerOutputFormat {
+	switch value {
+	case "json":
+		return JSONFormat
+	case "mono":
+		return ConsoleMonoFormat
+	case "color":
+		return ConsoleColoredFormat
+	}
+	return unrecognisedFormat
 }
