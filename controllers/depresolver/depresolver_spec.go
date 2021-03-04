@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var predefinedStrategy = k8gbv1beta1.Strategy{
@@ -30,7 +31,7 @@ var predefinedStrategy = k8gbv1beta1.Strategy{
 
 // ResolveGslbSpec fills Gslb by spec values. It executes always, when gslb is initialised.
 // If spec value is not defined, it will use the default value. Function returns error if input is invalid.
-func (dr *DependencyResolver) ResolveGslbSpec(ctx context.Context, gslb *k8gbv1beta1.Gslb) error {
+func (dr *DependencyResolver) ResolveGslbSpec(ctx context.Context, gslb *k8gbv1beta1.Gslb, client client.Client) error {
 	if !reflect.DeepEqual(gslb.Spec, dr.spec) {
 		// set predefined values if missing in the yaml
 		if gslb.Spec.Strategy.DNSTtlSeconds == 0 {
@@ -41,7 +42,7 @@ func (dr *DependencyResolver) ResolveGslbSpec(ctx context.Context, gslb *k8gbv1b
 		}
 		dr.errorSpec = dr.validateSpec(gslb.Spec.Strategy)
 		if dr.errorSpec == nil {
-			dr.errorSpec = dr.client.Update(ctx, gslb)
+			dr.errorSpec = client.Update(ctx, gslb)
 		}
 		dr.spec = gslb.Spec
 	}

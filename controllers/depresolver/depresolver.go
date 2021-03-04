@@ -28,7 +28,6 @@ import (
 	"github.com/AbsaOSS/k8gb/api/v1beta1"
 
 	"github.com/rs/zerolog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // LoggerOutputFormat specifies how the logger prints values
@@ -139,7 +138,6 @@ type Config struct {
 
 // DependencyResolver resolves configuration for GSLB
 type DependencyResolver struct {
-	client      client.Client
 	config      *Config
 	onceConfig  sync.Once
 	errorConfig error
@@ -148,8 +146,7 @@ type DependencyResolver struct {
 }
 
 // NewDependencyResolver returns a new depresolver.DependencyResolver
-func NewDependencyResolver(client client.Client) *DependencyResolver {
+func NewDependencyResolver() *DependencyResolver {
 	resolver := new(DependencyResolver)
-	resolver.client = client
 	return resolver
 }

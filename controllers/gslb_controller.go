@@ -86,7 +86,7 @@ func (r *GslbReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return result.RequeueError(fmt.Errorf("error reading the object (%s)", err))
 	}
 
-	err = r.DepResolver.ResolveGslbSpec(ctx, gslb)
+	err = r.DepResolver.ResolveGslbSpec(ctx, gslb, r.Client)
 	if err != nil {
 		return result.RequeueError(fmt.Errorf("resolving spec (%s)", err))
 	}
