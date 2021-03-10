@@ -23,36 +23,34 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
-
 	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
-	externaldns "sigs.k8s.io/external-dns/endpoint"
-
 	"github.com/AbsaOSS/k8gb/controllers/internal/utils"
-	"github.com/go-logr/logr"
+	"github.com/AbsaOSS/k8gb/controllers/log"
+
+	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	externaldns "sigs.k8s.io/external-dns/endpoint"
 )
 
 const coreDNSExtServiceName = "k8gb-coredns-lb"
 
-// GslbLoggerAssistant is common wrapper operating on GSLB instance
-// it directly logs messages into logr.Logger and use apimachinery client
-// to call kubernetes API
+// GslbLoggerAssistant is common wrapper operating on GSLB instance.
+// It uses apimachinery client to call kubernetes API
 type GslbLoggerAssistant struct {
-	log           logr.Logger
 	client        client.Client
 	k8gbNamespace string
 	edgeDNSServer string
 }
 
-func NewGslbAssistant(client client.Client, log logr.Logger, k8gbNamespace, edgeDNSServer string) *GslbLoggerAssistant {
+var logger = log.Logger()
+
+func NewGslbAssistant(client client.Client, k8gbNamespace, edgeDNSServer string) *GslbLoggerAssistant {
 	return &GslbLoggerAssistant{
 		client:        client,
-		log:           log,
 		k8gbNamespace: k8gbNamespace,
 		edgeDNSServer: edgeDNSServer,
 	}
@@ -65,7 +63,7 @@ func (r *GslbLoggerAssistant) CoreDNSExposedIPs() ([]string, error) {
 		types.NamespacedName{Namespace: r.k8gbNamespace, Name: coreDNSExtServiceName}, coreDNSService)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Info("Can't find %s service", coreDNSExtServiceName)
+			logger.Warn().Msgf("Can't find %s service", coreDNSExtServiceName)
 		}
 		return nil, err
 	}
@@ -74,13 +72,13 @@ func (r *GslbLoggerAssistant) CoreDNSExposedIPs() ([]string, error) {
 		lbHostname = coreDNSService.Status.LoadBalancer.Ingress[0].Hostname
 	} else {
 		errMessage := fmt.Sprintf("no Ingress LoadBalancer entries found for %s serice", coreDNSExtServiceName)
-		r.Info(errMessage)
+		logger.Warn().Msg(errMessage)
 		err := coreerrors.New(errMessage)
 		return nil, err
 	}
 	IPs, err := utils.Dig(r.edgeDNSServer, lbHostname)
 	if err != nil {
-		r.Info("Can't dig k8gb-coredns-lb service loadbalancer fqdn %s (%s)", lbHostname, err)
+		logger.Warn().Msgf("Can't dig k8gb-coredns-lb service loadbalancer fqdn %s (%s)", lbHostname, err)
 		return nil, err
 	}
 	return IPs, nil
@@ -98,7 +96,7 @@ func (r *GslbLoggerAssistant) GslbIngressExposedIPs(gslb *k8gbv1beta1.Gslb) ([]s
 	err := r.client.Get(context.TODO(), nn, gslbIngress)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Info("Can't find gslb Ingress: %s", gslb.Name)
+			logger.Info().Msgf("Can't find gslb Ingress: %s", gslb.Name)
 		}
 		return nil, err
 	}
@@ -112,7 +110,7 @@ func (r *GslbLoggerAssistant) GslbIngressExposedIPs(gslb *k8gbv1beta1.Gslb) ([]s
 		if len(ip.Hostname) > 0 {
 			IPs, err := utils.Dig(r.edgeDNSServer, ip.Hostname)
 			if err != nil {
-				r.Info("Dig error: %s", err)
+				logger.Warn().Msgf("Dig error: %s", err)
 				return nil, err
 			}
 			gslbIngressIPs = append(gslbIngressIPs, IPs...)
@@ -132,12 +130,12 @@ func (r *GslbLoggerAssistant) SaveDNSEndpoint(namespace string, i *externaldns.D
 	if err != nil && errors.IsNotFound(err) {
 
 		// Create the DNSEndpoint
-		r.Info("Creating a new DNSEndpoint:\n %s", utils.ToString(i))
+		logger.Info().Msgf("Creating a new DNSEndpoint:\n %s", utils.ToString(i))
 		err = r.client.Create(context.TODO(), i)
 
 		if err != nil {
 			// Creation failed
-			r.Error(err, "Failed to create new DNSEndpoint DNSEndpoint.Namespace: %s DNSEndpoint.Name %s",
+			logger.Err(err).Msgf("Failed to create new DNSEndpoint DNSEndpoint.Namespace: %s DNSEndpoint.Name %s",
 				i.Namespace, i.Name)
 			return err
 		}
@@ -145,7 +143,7 @@ func (r *GslbLoggerAssistant) SaveDNSEndpoint(namespace string, i *externaldns.D
 		return nil
 	} else if err != nil {
 		// Error that isn't due to the service not existing
-		r.Error(err, "Failed to get DNSEndpoint")
+		logger.Err(err).Msg("Failed to get DNSEndpoint")
 		return err
 	}
 
@@ -155,7 +153,7 @@ func (r *GslbLoggerAssistant) SaveDNSEndpoint(namespace string, i *externaldns.D
 
 	if err != nil {
 		// Update failed
-		r.Error(err, "Failed to update DNSEndpoint DNSEndpoint.Namespace %s DNSEndpoint.Name %s",
+		logger.Err(err).Msgf("Failed to update DNSEndpoint DNSEndpoint.Namespace %s DNSEndpoint.Name %s",
 			found.Namespace, found.Name)
 		return err
 	}
@@ -164,12 +162,12 @@ func (r *GslbLoggerAssistant) SaveDNSEndpoint(namespace string, i *externaldns.D
 
 // RemoveEndpoint removes endpoint
 func (r *GslbLoggerAssistant) RemoveEndpoint(endpointName string) error {
-	r.Info("Removing endpoint %s.%s", r.k8gbNamespace, endpointName)
+	logger.Info().Msgf("Removing endpoint %s.%s", r.k8gbNamespace, endpointName)
 	dnsEndpoint := &externaldns.DNSEndpoint{}
 	err := r.client.Get(context.Background(), client.ObjectKey{Namespace: r.k8gbNamespace, Name: endpointName}, dnsEndpoint)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Info("%s", err)
+			logger.Warn().Msgf("%s", err)
 			return nil
 		}
 		return err
@@ -186,30 +184,30 @@ func (r *GslbLoggerAssistant) InspectTXTThreshold(fqdn string, fakeDNSEnabled bo
 	ns := overrideWithFakeDNS(fakeDNSEnabled, r.edgeDNSServer)
 	txt, err := dns.Exchange(m, ns)
 	if err != nil {
-		r.Info("Error contacting EdgeDNS server (%s) for TXT split brain record: (%s)", ns, err)
+		logger.Info().Msgf("Error contacting EdgeDNS server (%s) for TXT split brain record: (%s)", ns, err)
 		return err
 	}
 	var timestamp string
 	if len(txt.Answer) > 0 {
 		if t, ok := txt.Answer[0].(*dns.TXT); ok {
-			r.Info("Split brain TXT raw record: %s", t.String())
+			logger.Info().Msgf("Split brain TXT raw record: %s", t.String())
 			timestamp = strings.Split(t.String(), "\t")[4]
 			timestamp = strings.Trim(timestamp, "\"") // Otherwise time.Parse() will miserably fail
 		}
 	}
 
 	if len(timestamp) > 0 {
-		r.Info("Split brain TXT raw time stamp: %s", timestamp)
+		logger.Info().Msgf("Split brain TXT raw time stamp: %s", timestamp)
 		timeFromTXT, err := time.Parse("2006-01-02T15:04:05", timestamp)
 		if err != nil {
 			return err
 		}
 
-		r.Info("Split brain TXT parsed time stamp: %s", timeFromTXT)
+		logger.Info().Msgf("Split brain TXT parsed time stamp: %s", timeFromTXT)
 		now := time.Now().UTC()
 
 		diff := now.Sub(timeFromTXT)
-		r.Info("Split brain TXT time diff: %s", diff)
+		logger.Info().Msgf("Split brain TXT time diff: %s", diff)
 
 		if diff > splitBrainThreshold {
 			return errors.NewResourceExpired(fmt.Sprintf("Split brain TXT record expired the time threshold: (%s)", splitBrainThreshold))
@@ -222,7 +220,7 @@ func (r *GslbLoggerAssistant) InspectTXTThreshold(fqdn string, fakeDNSEnabled bo
 func (r *GslbLoggerAssistant) GetExternalTargets(host string, fakeDNSEnabled bool, extGslbClusters []string) (targets []string) {
 	targets = []string{}
 	for _, cluster := range extGslbClusters {
-		r.Info("Adding external Gslb targets from %s cluster...", cluster)
+		logger.Info().Msgf("Adding external Gslb targets from %s cluster...", cluster)
 		g := new(dns.Msg)
 		host = fmt.Sprintf("localtargets-%s.", host) // Convert to true FQDN with dot at the end. Otherwise dns lib freaks out
 		g.SetQuestion(host, dns.TypeA)
@@ -231,7 +229,7 @@ func (r *GslbLoggerAssistant) GetExternalTargets(host string, fakeDNSEnabled boo
 
 		a, err := dns.Exchange(g, ns)
 		if err != nil {
-			r.Info("Error contacting external Gslb cluster(%s) : (%v)", cluster, err)
+			logger.Warn().Msgf("Contacting external Gslb cluster(%s) : (%v)", cluster, err)
 			return
 		}
 		var clusterTargets []string
@@ -242,20 +240,10 @@ func (r *GslbLoggerAssistant) GetExternalTargets(host string, fakeDNSEnabled boo
 		}
 		if len(clusterTargets) > 0 {
 			targets = append(targets, clusterTargets...)
-			r.Info("Added external %s Gslb targets from %s cluster", clusterTargets, cluster)
+			logger.Info().Msgf("Added external %s Gslb targets from %s cluster", clusterTargets, cluster)
 		}
 	}
 	return
-}
-
-// Info wraps private logger and provides log.Info()
-func (r *GslbLoggerAssistant) Info(msg string, args ...interface{}) {
-	r.log.Info(fmt.Sprintf(msg, args...))
-}
-
-// Error wraps private logger and provides log.Error()
-func (r *GslbLoggerAssistant) Error(err error, msg string, args ...interface{}) {
-	r.log.Error(err, fmt.Sprintf(msg, args...))
 }
 
 func overrideWithFakeDNS(fakeDNSEnabled bool, server string) (ns string) {

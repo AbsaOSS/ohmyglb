@@ -60,19 +60,20 @@ func (r *GslbReconciler) saveIngress(instance *k8gbv1beta1.Gslb, i *v1beta1.Ingr
 	if err != nil && errors.IsNotFound(err) {
 
 		// Create the service
-		log.Info("Creating a new Ingress", "Ingress.Namespace", i.Namespace, "Ingress.Name", i.Name)
+		logger.Info().Msgf("Creating a new Ingress, Ingress.Namespace %s, Ingress.Name: %s", i.Namespace, i.Name)
 		err = r.Create(context.TODO(), i)
 
 		if err != nil {
 			// Creation failed
-			log.Error(err, "Failed to create new Ingress", "Ingress.Namespace", i.Namespace, "Ingress.Name", i.Name)
+			logger.Err(err).Msgf("Failed to create new Ingress Ingress.Namespace: %s, Ingress.Name: %s",
+				i.Namespace, i.Name)
 			return err
 		}
 		// Creation was successful
 		return nil
 	} else if err != nil {
 		// Error that isn't due to the service not existing
-		log.Error(err, "Failed to get Ingress")
+		logger.Err(err).Msg("Failed to get Ingress")
 		return err
 	}
 
@@ -82,13 +83,14 @@ func (r *GslbReconciler) saveIngress(instance *k8gbv1beta1.Gslb, i *v1beta1.Ingr
 		found.Annotations = utils.MergeAnnotations(found.Annotations, i.Annotations)
 		err = r.Update(context.TODO(), found)
 		if errors.IsConflict(err) {
-			r.Log.Info("Ingress has been modified outside of controller, retrying reconciliation",
-				"Ingress.Namespace", found.Namespace, "Ingress.Name", found.Name)
+			logger.Info().Msgf("Ingress has been modified outside of controller, retrying reconciliation"+
+				"Ingress.Namespace %s, Ingress.Name: %s", found.Namespace, found.Name)
 			return nil
 		}
 		if err != nil {
 			// Update failed
-			log.Error(err, "Failed to update Ingress", "Ingress.Namespace", found.Namespace, "Ingress.Name", found.Name)
+			logger.Err(err).Msgf("Failed to update Ingress Ingress.Namespace %s, Ingress.Name: %s",
+				found.Namespace, found.Name)
 			return err
 		}
 	}

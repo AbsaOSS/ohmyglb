@@ -44,9 +44,9 @@ func parseQuery(m *dns.Msg) {
 	for _, q := range m.Question {
 		switch q.Qtype {
 		case dns.TypeA:
-			log.Info(fmt.Sprintf("Query for %s\n", q.Name))
+			logger.Info().Msgf("Query for %s\n", q.Name)
 			ips := records[q.Name]
-			log.Info(fmt.Sprintf("IPs found: %s\n", ips))
+			logger.Info().Msgf("IPs found: %s\n", ips)
 			if len(ips) > 0 {
 				for _, ip := range ips {
 					rr, err := dns.NewRR(fmt.Sprintf("%s A %s", q.Name, ip))
@@ -56,9 +56,9 @@ func parseQuery(m *dns.Msg) {
 				}
 			}
 		case dns.TypeTXT:
-			log.Info(fmt.Sprintf("Query for TXT %s\n", q.Name))
+			logger.Info().Msgf("Query for TXT %s\n", q.Name)
 			TXTs := records[q.Name]
-			log.Info(fmt.Sprintf("TXTs found: %s\n", TXTs))
+			logger.Info().Msgf("TXTs found: %s\n", TXTs)
 			if len(TXTs) > 0 {
 				for _, txt := range TXTs {
 					rr, err := dns.NewRR(fmt.Sprintf("%s TXT %s", q.Name, txt))
@@ -82,7 +82,7 @@ func handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 
 	err := w.WriteMsg(m)
 	if err != nil {
-		log.Info(fmt.Sprintf("Failed to write message:%s", err))
+		logger.Err(err).Msg("Failed to write message")
 	}
 }
 
@@ -94,17 +94,17 @@ func fakeDNS() {
 	port := 7753
 	server := &dns.Server{Addr: ":" + strconv.Itoa(port), Net: "udp"}
 	go func() {
-		log.Info(fmt.Sprintf("Starting at %d\n", port))
+		logger.Info().Msgf("Starting at %d\n", port)
 		err := server.ListenAndServe()
 		defer func() {
 			err := server.Shutdown()
 			if err != nil {
-				log.Error(err, "Failed to shutdown fakeDNS server")
+				logger.Err(err).Msg("Failed to shutdown fakeDNS server")
 			}
 
 		}()
 		if err != nil {
-			log.Error(err, "Failed to start fakeDNS server")
+			logger.Err(err).Msg("Failed to start fakeDNS server")
 		}
 	}()
 }

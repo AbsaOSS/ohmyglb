@@ -27,6 +27,7 @@ import (
 
 	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
 	"github.com/AbsaOSS/k8gb/controllers/internal/utils"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -22,33 +22,27 @@ import (
 	"github.com/AbsaOSS/k8gb/controllers/depresolver"
 	"github.com/AbsaOSS/k8gb/controllers/providers/assistant"
 
-	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ProviderFactory struct {
 	config depresolver.Config
 	client client.Client
-	log    logr.Logger
 }
 
-func NewDNSProviderFactory(client client.Client, config depresolver.Config, log logr.Logger) (f *ProviderFactory, err error) {
-	if log == nil {
-		err = fmt.Errorf("nil log")
-	}
+func NewDNSProviderFactory(client client.Client, config depresolver.Config) (f *ProviderFactory, err error) {
 	if client == nil {
 		err = fmt.Errorf("nil client")
 	}
 	f = &ProviderFactory{
 		config: config,
-		log:    log,
 		client: client,
 	}
 	return
 }
 
 func (f *ProviderFactory) Provider() (provider IDnsProvider) {
-	a := assistant.NewGslbAssistant(f.client, f.log, f.config.K8gbNamespace, f.config.EdgeDNSServer)
+	a := assistant.NewGslbAssistant(f.client, f.config.K8gbNamespace, f.config.EdgeDNSServer)
 	switch f.config.EdgeDNSType {
 	case depresolver.DNSTypeNS1:
 		provider = NewExternalDNS(externalDNSTypeNS1, f.config, a)

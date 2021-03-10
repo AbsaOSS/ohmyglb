@@ -11,13 +11,15 @@ require (
 	github.com/lixiangzhong/dnsutil v0.0.0-20191203032812-75ad39d2945a
 	github.com/miekg/dns v1.1.40
 	github.com/onsi/ginkgo v1.14.2 // indirect
+	github.com/onsi/gomega v1.10.2 // indirect
 	github.com/prometheus/client_golang v1.9.0
 	github.com/rs/zerolog v1.20.0
 	github.com/stretchr/testify v1.7.0
+	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 	k8s.io/api v0.20.4
+	k8s.io/apiextensions-apiserver v0.20.2 // indirect
 	k8s.io/apimachinery v0.20.4
 	k8s.io/client-go v0.20.4
 	sigs.k8s.io/controller-runtime v0.6.4
-	sigs.k8s.io/controller-tools v0.5.0 // indirect
 	sigs.k8s.io/external-dns v0.7.6
 )

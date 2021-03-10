@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
+	"github.com/AbsaOSS/k8gb/controllers/depresolver"
 	"github.com/AbsaOSS/k8gb/controllers/internal/utils"
+	"github.com/AbsaOSS/k8gb/controllers/log"
 	"github.com/AbsaOSS/k8gb/controllers/providers/dns"
-
 	"github.com/AbsaOSS/k8gb/controllers/providers/metrics"
 
-	"github.com/AbsaOSS/k8gb/controllers/depresolver"
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,20 +36,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	externaldns "sigs.k8s.io/external-dns/endpoint"
-
-	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
 )
-
-var log = logf.Log.WithName("controller_gslb")
 
 // GslbReconciler reconciles a Gslb object
 type GslbReconciler struct {
 	client.Client
-	Log         logr.Logger
 	Scheme      *runtime.Scheme
 	Config      *depresolver.Config
 	DepResolver *depresolver.DependencyResolver
@@ -65,14 +59,15 @@ const (
 	strategyAnnotation      = "k8gb.io/strategy"
 )
 
+var logger = log.Logger()
+
 // +kubebuilder:rbac:groups=k8gb.absa.oss,resources=gslbs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8gb.absa.oss,resources=gslbs/status,verbs=get;update;patch
 
 // Reconcile runs main reconiliation loop
 func (r *GslbReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithValues("gslb", req.NamespacedName)
-	result := utils.NewReconcileResultHandler(r.Config.ReconcileRequeueSeconds, log)
+	result := utils.NewReconcileResultHandler(r.Config.ReconcileRequeueSeconds)
 	// Fetch the Gslb instance
 	gslb := &k8gbv1beta1.Gslb{}
 	err := r.Get(ctx, req.NamespacedName, gslb)
@@ -112,6 +107,7 @@ func (r *GslbReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				return result.RequeueError(err)
 			}
 		}
+		logger.Info().Msg("reconciler exit")
 		return result.Stop()
 	}
 
@@ -176,7 +172,7 @@ func (r *GslbReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			c := mgr.GetClient()
 			err := c.List(context.TODO(), gslbList, opts...)
 			if err != nil {
-				log.Info("Can't fetch gslb objects")
+				logger.Info().Msg("Can't fetch gslb objects")
 				return nil
 			}
 			gslbName := ""
@@ -201,8 +197,8 @@ func (r *GslbReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		})
 
 	createGslbFromIngress := func(annotationKey string, annotationValue string, a handler.MapObject, strategy string) {
-		log.Info(fmt.Sprintf("Detected strategy annotation(%s:%s) on Ingress(%s)",
-			annotationKey, annotationValue, a.Meta.GetName()))
+		logger.Info().Msgf("Detected strategy annotation(%s:%s) on Ingress(%s)",
+			annotationKey, annotationValue, a.Meta.GetName())
 		c := mgr.GetClient()
 		ingressToReuse := &v1beta1.Ingress{}
 		err := c.Get(context.Background(), client.ObjectKey{
@@ -210,7 +206,7 @@ func (r *GslbReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			Name:      a.Meta.GetName(),
 		}, ingressToReuse)
 		if err != nil {
-			log.Info(fmt.Sprintf("Ingress(%s) does not exist anymore. Skipping Glsb creation...", a.Meta.GetName()))
+			logger.Info().Msgf("Ingress(%s) does not exist anymore. Skipping Glsb creation...", a.Meta.GetName())
 			return
 		}
 		gslbExist := &k8gbv1beta1.Gslb{}
@@ -219,7 +215,7 @@ func (r *GslbReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			Name:      a.Meta.GetName(),
 		}, gslbExist)
 		if err == nil {
-			log.Info(fmt.Sprintf("Gslb(%s) already exists. Skipping Gslb creation...", gslbExist.Name))
+			logger.Info().Msgf("Gslb(%s) already exists. Skipping Gslb creation...", gslbExist.Name)
 			return
 		}
 		gslb := &k8gbv1beta1.Gslb{
@@ -243,15 +239,15 @@ func (r *GslbReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 			}
 			if gslb.Spec.Strategy.PrimaryGeoTag == "" {
-				log.Info(fmt.Sprintf("%s annotation is missing, skipping Gslb creation...", primaryGeoTagAnnotation))
+				logger.Info().Msgf("%s annotation is missing, skipping Gslb creation...", primaryGeoTagAnnotation)
 				return
 			}
 		}
 
-		log.Info(fmt.Sprintf("Creating new Gslb(%s) out of Ingress annotation", gslb.Name))
+		logger.Info().Msgf("Creating new Gslb(%s) out of Ingress annotation", gslb.Name)
 		err = c.Create(context.Background(), gslb)
 		if err != nil {
-			log.Error(err, "Glsb creation failed")
+			logger.Err(err).Msg("Glsb creation failed")
 		}
 	}
 	ingressMapFn := handler.ToRequestsFunc(
@@ -280,5 +276,4 @@ func (r *GslbReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&handler.EnqueueRequestsFromMapFunc{
 				ToRequests: ingressMapFn}).
 		Complete(r)
-
 }
