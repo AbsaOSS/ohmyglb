@@ -64,7 +64,7 @@ func TestCanFilterOutDelegatedZoneEntryAccordingFQDNProvided(t *testing.T) {
 	customConfig := predefinedConfig
 	customConfig.EdgeDNSZone = "example.com"
 	customConfig.ExtClustersGeoTags = []string{"za"}
-	a := assistant.NewGslbAssistant(nil, nil, customConfig.K8gbNamespace, customConfig.EdgeDNSServer)
+	a := assistant.NewGslbAssistant(nil, customConfig.K8gbNamespace, customConfig.EdgeDNSServer)
 	provider := NewInfobloxDNS(customConfig, a)
 	// act
 	extClusters := nsServerNameExt(customConfig)

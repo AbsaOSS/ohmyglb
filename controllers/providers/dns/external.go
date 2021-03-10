@@ -21,6 +21,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/AbsaOSS/k8gb/controllers/log"
+
 	assistant2 "github.com/AbsaOSS/k8gb/controllers/providers/assistant"
 
 	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
@@ -43,6 +45,8 @@ type ExternalDNSProvider struct {
 	endpointName string
 }
 
+var logger = log.Logger()
+
 func NewExternalDNS(dnsType ExternalDNSType, config depresolver.Config, assistant assistant2.IAssistant) *ExternalDNSProvider {
 	return &ExternalDNSProvider{
 		assistant:    assistant,
@@ -54,7 +58,7 @@ func NewExternalDNS(dnsType ExternalDNSType, config depresolver.Config, assistan
 
 func (p *ExternalDNSProvider) CreateZoneDelegationForExternalDNS(gslb *k8gbv1beta1.Gslb) error {
 	ttl := externaldns.TTL(gslb.Spec.Strategy.DNSTtlSeconds)
-	p.assistant.Info("Creating/Updating DNSEndpoint CRDs for %s...", p)
+	logger.Info().Msgf("Creating/Updating DNSEndpoint CRDs for %s...", p)
 	var NSServerList []string
 	NSServerList = append(NSServerList, nsServerName(p.config))
 	NSServerList = append(NSServerList, nsServerNameExt(p.config)...)

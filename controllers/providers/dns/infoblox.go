@@ -81,12 +81,12 @@ func (p *InfobloxProvider) CreateZoneDelegationForExternalDNS(gslb *k8gbv1beta1.
 					p.config.Override.FakeDNSEnabled,
 					time.Second*time.Duration(gslb.Spec.Strategy.SplitBrainThresholdSeconds))
 				if err != nil {
-					p.assistant.Error(err, "Got the error from TXT based checkAlive. External cluster (%s) doesn't "+
+					logger.Err(err).Msgf("Got the error from TXT based checkAlive. External cluster (%s) doesn't "+
 						"look alive, filtering it out from delegated zone configuration...", extCluster)
 					existingDelegateTo = p.filterOutDelegateTo(existingDelegateTo, extCluster)
 				}
 			}
-			p.assistant.Info("Updating delegated zone(%s) with the server list(%v)", p.config.DNSZone, existingDelegateTo)
+			logger.Info().Msgf("Updating delegated zone(%s) with the server list(%v)", p.config.DNSZone, existingDelegateTo)
 
 			_, err = objMgr.UpdateZoneDelegated(findZone.Ref, existingDelegateTo)
 			if err != nil {
@@ -94,7 +94,7 @@ func (p *InfobloxProvider) CreateZoneDelegationForExternalDNS(gslb *k8gbv1beta1.
 			}
 		}
 	} else {
-		p.assistant.Info("Creating delegated zone(%s)...", p.config.DNSZone)
+		logger.Info().Msgf("Creating delegated zone(%s)...", p.config.DNSZone)
 		_, err = objMgr.CreateZoneDelegated(p.config.DNSZone, delegateTo)
 		if err != nil {
 			return err
@@ -108,13 +108,13 @@ func (p *InfobloxProvider) CreateZoneDelegationForExternalDNS(gslb *k8gbv1beta1.
 		return err
 	}
 	if heartbeatTXTRecord == nil {
-		p.assistant.Info("Creating split brain TXT record(%s)...", heartbeatTXTName)
+		logger.Info().Msgf("Creating split brain TXT record(%s)...", heartbeatTXTName)
 		_, err := objMgr.CreateTXTRecord(heartbeatTXTName, edgeTimestamp, gslb.Spec.Strategy.DNSTtlSeconds, "default")
 		if err != nil {
 			return err
 		}
 	} else {
-		p.assistant.Info("Updating split brain TXT record(%s)...", heartbeatTXTName)
+		logger.Info().Msgf("Updating split brain TXT record(%s)...", heartbeatTXTName)
 		_, err := objMgr.UpdateTXTRecord(heartbeatTXTName, edgeTimestamp)
 		if err != nil {
 			return err
@@ -139,7 +139,7 @@ func (p *InfobloxProvider) Finalize(gslb *k8gbv1beta1.Gslb) error {
 			return err
 		}
 		if len(findZone.Ref) > 0 {
-			p.assistant.Info("Deleting delegated zone(%s)...", p.config.DNSZone)
+			logger.Info().Msgf("Deleting delegated zone(%s)...", p.config.DNSZone)
 			_, err := objMgr.DeleteZoneDelegated(findZone.Ref)
 			if err != nil {
 				return err
@@ -155,7 +155,7 @@ func (p *InfobloxProvider) Finalize(gslb *k8gbv1beta1.Gslb) error {
 
 	if findTXT != nil {
 		if len(findTXT.Ref) > 0 {
-			p.assistant.Info("Deleting split brain TXT record(%s)...", heartbeatTXTName)
+			logger.Info().Msgf("Deleting split brain TXT record(%s)...", heartbeatTXTName)
 			_, err := objMgr.DeleteTXTRecord(findTXT.Ref)
 			if err != nil {
 				return err

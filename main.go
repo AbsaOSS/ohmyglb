@@ -21,16 +21,15 @@ import (
 	k8gbv1beta1 "github.com/AbsaOSS/k8gb/api/v1beta1"
 	"github.com/AbsaOSS/k8gb/controllers"
 	"github.com/AbsaOSS/k8gb/controllers/depresolver"
+	"github.com/AbsaOSS/k8gb/controllers/log"
 	"github.com/AbsaOSS/k8gb/controllers/providers/dns"
 	"github.com/AbsaOSS/k8gb/controllers/providers/metrics"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 	externaldns "sigs.k8s.io/external-dns/endpoint"
 	// +kubebuilder:scaffold:imports
@@ -59,14 +58,14 @@ func main() {
 
 	resolver := depresolver.NewDependencyResolver()
 	config, err := resolver.ResolveOperatorConfig()
-	// LoggerFactory creates logger ALWAYS - no matter what isn't resolved
-	logger := controllers.NewLogger(config).Get()
+	log.Init(config)
+	logger := log.Logger()
 	if err != nil {
 		logger.Err(err).Msg("can't resolve environment variables")
 		os.Exit(1)
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(log.NewAdapter(logger))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             runtimescheme,
@@ -95,12 +94,11 @@ func main() {
 		Config:      config,
 		Client:      mgr.GetClient(),
 		DepResolver: resolver,
-		Log:         ctrl.Log.WithName("controllers").WithName("Gslb"),
 		Scheme:      mgr.GetScheme(),
 	}
 
 	logger.Info().Msg("starting DNS provider")
-	f, err = dns.NewDNSProviderFactory(reconciler.Client, *reconciler.Config, reconciler.Log)
+	f, err = dns.NewDNSProviderFactory(reconciler.Client, *reconciler.Config)
 	if err != nil {
 		logger.Err(err).Msgf("unable to create factory (%s)", err)
 		os.Exit(1)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package log
 
 import (
 	"os"
@@ -25,21 +25,21 @@ import (
 	"github.com/rs/zerolog/pkgerrors"
 )
 
-// LoggerFactory creates new logger
-type LoggerFactory struct {
+// loggerFactory creates new logger
+type loggerFactory struct {
 	log depresolver.Log
 }
 
-func NewLogger(config *depresolver.Config) *LoggerFactory {
+func newLogger(config *depresolver.Config) *loggerFactory {
 	if config == nil {
-		return &LoggerFactory{log: depresolver.Log{}}
+		return &loggerFactory{log: depresolver.Log{}}
 	}
-	return &LoggerFactory{log: config.Log}
+	return &loggerFactory{log: config.Log}
 }
 
 // Get returns new logger even if it doesn't know level or format.
 // In such case returns default logger
-func (l *LoggerFactory) Get() zerolog.Logger {
+func (l *loggerFactory) get() zerolog.Logger {
 	var logger zerolog.Logger
 	var dt = time.RFC822Z
 	if l.log.Format == depresolver.NoFormat {

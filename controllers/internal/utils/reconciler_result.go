@@ -19,25 +19,21 @@ package utils
 import (
 	"time"
 
-	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type ReconcileResultHandler struct {
-	log           logr.Logger
 	delayedResult ctrl.Result
 }
 
-func NewReconcileResultHandler(reconcileAfter int, log logr.Logger) *ReconcileResultHandler {
+func NewReconcileResultHandler(reconcileAfter int) *ReconcileResultHandler {
 	return &ReconcileResultHandler{
 		delayedResult: ctrl.Result{RequeueAfter: time.Second * time.Duration(reconcileAfter)},
-		log:           log,
 	}
 }
 
 // Stop stops reconciliation loop
 func (r *ReconcileResultHandler) Stop() (ctrl.Result, error) {
-	r.log.Info("reconciler exit")
 	return ctrl.Result{}, nil
 }
 
