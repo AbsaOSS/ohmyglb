@@ -2,18 +2,6 @@
 ## Ref: https://github.com/kubernetes/ingress/blob/master/controllers/nginx/configuration.md
 ##
 controller:
-  hostNetwork: true
-
-  ## Use host ports 80 and 443
-  daemonset:
-    useHostPort: false
-
-    hostPorts:
-      http: 80
-      https: 443
-
-  kind: DaemonSet
-
   service:
     enabled: true
 
@@ -28,11 +16,4 @@ controller:
       http: http
       https: https
 
-    type: NodePort
-
-
-# UDP service key:value pairs
-# Ref: https://github.com/kubernetes/contrib/tree/master/ingress/controllers/nginx/examples/udp
-##
-udp:
-  53: "k8gb/k8gb-coredns:53"
+    type: LoadBalancer

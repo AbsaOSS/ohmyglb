@@ -19,26 +19,24 @@ jobs:
         with:
           cluster-name: "test-gslb1"
           args: >-
-            -p "80:80@agent[0]"
-            -p "443:443@agent[0]"
-            -p "5053:53/udp@agent[0]"
+            -p "80:80@loadbalancer"
+            -p "443:443@loadbalancer"
+            -p "5053:53/udp@loadbalancer"
             --agents 1
-            --no-lb
             --network k3d-action-bridge-network
-            --k3s-server-arg "--no-deploy=traefik,servicelb,metrics-server"
+            --k3s-server-arg "--no-deploy=traefik,metrics-server"
 
       - name: Create 2nd k3s Cluster
         uses: AbsaOSS/k3d-action@v1.3.1
         with:
           cluster-name: "test-gslb2"
           args: >-
-            -p "81:80@agent[0]"
-            -p "444:443@agent[0]"
-            -p "5054:53/udp@agent[0]"
+            -p "81:80@loadbalancer"
+            -p "444:443@loadbalancer"
+            -p "5054:53/udp@loadbalancer"
             --network k3d-action-bridge-network
             --agents 1
-            --no-lb
-            --k3s-server-arg "--no-deploy=traefik,servicelb,metrics-server"
+            --k3s-server-arg "--no-deploy=traefik,metrics-server"
 
       - name: K8GB deployment
         run: |

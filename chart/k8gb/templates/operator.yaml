@@ -111,7 +111,7 @@ spec:
             - name: NS1_ENABLED
               value: "true"
             {{ end }}
-            {{ if .Values.k8gb.exposeCoreDNS }}
+            {{ if eq "LoadBalancer" .Values.coredns.serviceType }}
             - name: COREDNS_EXPOSED
               value: "true"
             {{ end }}

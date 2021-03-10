@@ -92,7 +92,7 @@ var predefinedConfig = depresolver.Config{
 	},
 }
 
-const coreDNSExtServiceName = "k8gb-coredns-lb"
+const coreDNSExtServiceName = "k8gb-coredns"
 
 func TestNotFoundServiceStatus(t *testing.T) {
 	// arrange

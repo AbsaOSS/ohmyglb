@@ -38,20 +38,22 @@ kubectl patch -n ingress-nginx -p '{"data":{"53":"k8gb/k8gb-coredns:53"}}' --typ
 kubectl create -n ingress-nginx cm udp-services --from-literal="53"="k8gb/k8gb-coredns:53"
 ```
 
-[Local project setup](./local.md) does this patching automatically.
-
 ## External load balancer
 
-CoreDNS can be also exposed for DNS UDP traffic via external load balancer,
-if underlying infrastructure supports that.<br>
+CoreDNS can be also exposed for DNS UDP traffic via LoadBalancer service type, if underlying infrastructure supports that.<br>
 [AWS EKS](https://aws.amazon.com/eks) with [NLB](https://docs.aws.amazon.com/eks/latest/userguide/load-balancing.html) and [k3d](https://www.k3d.io) with [ServiceLB](https://rancher.com/docs/k3s/latest/en/networking/#service-load-balancer) are good examples of such an infrastructure proven to work for k8gb deployments.<br>
-We're using this approach in our [AWS+Route53](deploy_route53.md) reference setup, with [k8gb helm chart](https://artifacthub.io/packages/helm/k8gb/k8gb) providing out of the box support for external load balancer scenario. CoreDNS service is exposed by setting `k8gb.exposeCoreDNS` helm chart value to `true`:
+We're using this approach in our [AWS+Route53](deploy_route53.md) reference setup, with [k8gb helm chart](https://artifacthub.io/packages/helm/k8gb/k8gb) providing out of the box support for external load balancer scenario. CoreDNS service is exposed by setting `coredns.serviceType` helm chart value to `LoadBalancer`:
+
 ```yaml
 # k8gb helm chart values.yaml example:
 
-k8gb:
+coredns:
   ...
-  exposeCoreDNS: true # <== expose UDP DNS traffic via external load balancer
+  serviceType: LoadBalancer # <== expose CoreDNS service via external load balancer
+  service:
+    annotations:
+      # tell AWS to use NLB load balancer
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
 ```
 
 In general, resulting `Service` resource configuration for k8gb CoreDNS looks like:
@@ -61,8 +63,8 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: nlb # <== tell AWS to use NLB load balancer
-  name: k8gb-coredns-lb
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  name: k8gb-coredns
   namespace: k8gb
 spec:
   ports:

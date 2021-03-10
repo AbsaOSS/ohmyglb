@@ -94,8 +94,8 @@ deploy:
 .PHONY: deploy-full-local-setup
 deploy-full-local-setup: ## Deploy full local multicluster setup
 	docker network create --driver=bridge --subnet=172.16.0.0/24 $(CLUSTER_GSLB_NETWORK)
-	$(call create-local-cluster,$(CLUSTER_GSLB1),-p "80:80@agent[0]" -p "443:443@agent[0]" -p "5053:53/udp@agent[0]" )
-	$(call create-local-cluster,$(CLUSTER_GSLB2),-p "81:80@agent[0]" -p "444:443@agent[0]" -p "5054:53/udp@agent[0]" )
+	$(call create-local-cluster,$(CLUSTER_GSLB1),-p "80:80@loadbalancer" -p "443:443@loadbalancer" -p "5053:53/udp@loadbalancer" )
+	$(call create-local-cluster,$(CLUSTER_GSLB2),-p "81:80@loadbalancer" -p "444:443@loadbalancer" -p "5054:53/udp@loadbalancer" )
 
 	$(call deploy-local-cluster,$(CLUSTER_GSLB1),$(CLUSTER_GSLB2),$(VERSION),)
 	$(call deploy-local-cluster,$(CLUSTER_GSLB2),$(CLUSTER_GSLB1),$(VERSION),$(CLUSTER_GSLB2_HELM_ARGS))
@@ -298,7 +298,7 @@ help: ## Show this help
 define create-local-cluster
 	@echo "\n$(YELLOW)Deploy local cluster $(CYAN)$1 $(NC)"
 	k3d cluster create $1 $2 \
-	--agents 1 --no-lb --k3s-server-arg "--no-deploy=traefik,servicelb,metrics-server" --network $(CLUSTER_GSLB_NETWORK)
+	--agents 1 --k3s-server-arg "--no-deploy=traefik,metrics-server" --network $(CLUSTER_GSLB_NETWORK)
 endef
 
 define deploy-local-cluster
@@ -312,7 +312,7 @@ define deploy-local-cluster
 	cd chart/k8gb && helm dependency update
 	helm -n k8gb upgrade -i k8gb chart/k8gb -f $(VALUES_YAML) \
 		--set k8gb.hostAlias.enabled=true \
-		--set k8gb.hostAlias.ip="`$(call get-host-alias-ip,k3d-$1,k3d-$2)`" \
+		--set k8gb.hostAlias.ip="`$(call get-host-alias-ip,k3d-$2)`" \
 		--set k8gb.imageTag=$3 $4
 
 	@echo "\n$(YELLOW)Deploy Ingress $(NC)"
@@ -354,12 +354,10 @@ define get-cluster-geo-tag
 	kubectl -n k8gb describe deploy k8gb |  awk '/CLUSTER_GEO_TAG/ { printf $$2 }'
 endef
 
-# get-host-alias-ip switch to second context ($2), search for IP and switch back to first context ($1)
+# get-host-alias-ip uses second cluster context ($1), search for IP
 # function returns one IP address
 define get-host-alias-ip
-	kubectl config use-context $2 > /dev/null && \
-	kubectl get nodes $2-agent-0 -o custom-columns='IP:status.addresses[0].address' --no-headers && \
-	kubectl config use-context $1 > /dev/null
+	kubectl --context $1 get nodes $1-agent-0 -o custom-columns='IP:status.addresses[0].address' --no-headers
 endef
 
 define hit-testapp-host
@@ -369,11 +367,9 @@ define hit-testapp-host
 endef
 
 define init-test-strategy
- 	kubectl config use-context k3d-test-gslb2
- 	kubectl apply -f $1
- 	kubectl config use-context k3d-test-gslb1
- 	kubectl apply -f $1
- 	$(call testapp-set-replicas,2)
+	kubectl --context k3d-test-gslb2 apply -f $1
+	kubectl --context k3d-test-gslb1 apply -f $1
+	$(call testapp-set-replicas,2)
 endef
 
 define testapp-set-replicas

@@ -21,7 +21,6 @@ k8gb:
     hostnames:
      - "gslb-ns-cloud-example-com-us.example.com"
   reconcileRequeueSeconds: 30
-  exposeCoreDNS: false # Create Service type LoadBalancer to expose CoreDNS
 
 externaldns:
   image: k8s.gcr.io/external-dns/external-dns:v0.7.6
@@ -32,6 +31,7 @@ externaldns:
     runAsNonRoot: true
 
 coredns:
+  serviceType: LoadBalancer
   isClusterService: false
   image:
     repository: absaoss/k8s_crd
@@ -42,6 +42,7 @@ coredns:
   servers:
   - zones:
     - zone: .
+      scheme: dns://
     port: 53
     plugins:
     - name: errors

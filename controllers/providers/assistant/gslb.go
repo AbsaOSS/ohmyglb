@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const coreDNSExtServiceName = "k8gb-coredns-lb"
+const coreDNSExtServiceName = "k8gb-coredns"
 
 // GslbLoggerAssistant is common wrapper operating on GSLB instance
 // it directly logs messages into logr.Logger and use apimachinery client
@@ -80,7 +80,7 @@ func (r *GslbLoggerAssistant) CoreDNSExposedIPs() ([]string, error) {
 	}
 	IPs, err := utils.Dig(r.edgeDNSServer, lbHostname)
 	if err != nil {
-		r.Info("Can't dig k8gb-coredns-lb service loadbalancer fqdn %s (%s)", lbHostname, err)
+		r.Info("Can't dig k8gb-coredns service loadbalancer fqdn %s (%s)", lbHostname, err)
 		return nil, err
 	}
 	return IPs, nil
