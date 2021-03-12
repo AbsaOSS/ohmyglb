@@ -119,6 +119,8 @@ deploy-to-AbsaOSS-k3d-action:
 	kubectl config use-context k3d-$(CLUSTER_GSLB1)
 	kubectl get pods -A
 
+
+
 .PHONY: deploy-gslb-operator
 deploy-gslb-operator: ## Deploy k8gb operator
 	kubectl apply -f deploy/namespace.yaml
@@ -270,7 +272,13 @@ test-failover:
 # executes terra-tests
 .PHONY: terratest
 terratest: # Run terratest suite
-	cd terratest/test/ && go mod download && go test -v
+	cd terratest/test/ && go mod download && go test -v 2>&1 || true
+	@echo "\n$(YELLOW)LOGS $(NC)"
+	kubectl logs `kubectl get pod -l name=k8gb -n k8gb -o jsonpath="{.items[0].metadata.name}"` -n k8gb
+	@echo "\n$(YELLOW)DESCRIBE $(NC)"
+	kubectl describe pod `kubectl get pod -l name=k8gb -n k8gb -o jsonpath="{.items[0].metadata.name}"` -n k8gb
+	@echo "\n$(YELLOW)GET -o json $(NC)"
+	kubectl get pod `kubectl get pod -l name=k8gb -n k8gb -o jsonpath="{.items[0].metadata.name}"` -n k8gb -o json
 
 # uninstall CRDs from a cluster
 .PHONY: uninstall
